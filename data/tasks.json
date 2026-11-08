@@ -1,0 +1,24 @@
+[
+  {
+    "id": "b1a6bc3d",
+    "title": "学习 MCP 协议",
+    "priority": "high",
+    "status": "todo",
+    "created_at": "2026-11-05T17:44:29"
+  },
+  {
+    "id": "54608bfd",
+    "title": "用 Codex 开发 tasker 项目",
+    "priority": "normal",
+    "status": "todo",
+    "created_at": "2026-11-05T17:44:29"
+  },
+  {
+    "id": "1ab3bdd2",
+    "title": "MCP 冒烟：验证截止日期",
+    "priority": "normal",
+    "due_date": "2026-11-10",
+    "status": "todo",
+    "created_at": "2026-11-05T19:09:48"
+  }
+]
