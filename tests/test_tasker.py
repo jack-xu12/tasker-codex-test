@@ -1,3 +1,6 @@
+import contextlib
+import io
+import os
 import sys
 import tempfile
 import unittest
@@ -5,6 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tasker import cli as cli_mod  # noqa: E402
 from tasker.store import StoreError, TaskStore  # noqa: E402
 
 
@@ -18,35 +22,37 @@ class TaskStoreTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def test_add_assigns_id_and_defaults(self):
-        t = self.store.add("write docs")
-        self.assertEqual(t["title"], "write docs")
-        self.assertEqual(t["status"], "todo")
-        self.assertEqual(t["priority"], "normal")
-        self.assertIsNone(t["due_date"])
-        self.assertEqual(len(t["id"]), 8)
+        task = self.store.add("write docs")
+        self.assertEqual(task["title"], "write docs")
+        self.assertEqual(task["status"], "todo")
+        self.assertEqual(task["priority"], "normal")
+        self.assertIsNone(task["due_date"])
+        self.assertEqual(len(task["id"]), 8)
 
     def test_add_stores_due_date(self):
-        t = self.store.add("ship feature", due_date="2026-12-31")
-        self.assertEqual(t["due_date"], "2026-12-31")
+        task = self.store.add("ship feature", due_date="2026-12-31")
+        self.assertEqual(task["due_date"], "2026-12-31")
         self.assertEqual(TaskStore(self.db).list()[0]["due_date"], "2026-12-31")
 
     def test_list_filters_by_status(self):
-        a = self.store.add("a")
-        b = self.store.add("b")
-        self.store.set_status(b["id"], "done")
-        self.assertEqual([t["id"] for t in self.store.list("todo")], [a["id"]])
-        self.assertEqual([t["id"] for t in self.store.list("done")], [b["id"]])
+        first = self.store.add("a")
+        second = self.store.add("b")
+        self.store.set_status(second["id"], "done")
+
+        self.assertEqual([task["id"] for task in self.store.list("todo")], [first["id"]])
+        self.assertEqual([task["id"] for task in self.store.list("done")], [second["id"]])
         self.assertEqual(len(self.store.list()), 2)
 
     def test_stats_counts(self):
         self.store.add("a")
         self.store.add("b")
         self.store.set_status(self.store.add("c")["id"], "doing")
-        s = self.store.stats()
-        self.assertEqual(s["total"], 3)
-        self.assertEqual(s["todo"], 2)
-        self.assertEqual(s["doing"], 1)
-        self.assertEqual(s["done"], 0)
+
+        stats = self.store.stats()
+        self.assertEqual(stats["total"], 3)
+        self.assertEqual(stats["todo"], 2)
+        self.assertEqual(stats["doing"], 1)
+        self.assertEqual(stats["done"], 0)
 
     def test_persistence_across_instances(self):
         self.store.add("survive me")
@@ -59,14 +65,67 @@ class TaskStoreTests(unittest.TestCase):
             self.store.add("x", priority="urgent")
         with self.assertRaises(StoreError):
             self.store.set_status("nope", "done")
+
         for bad_due_date in ("2026/12/31", "2026-13-01", "not-a-date", "", 20261231):
             with self.assertRaises(StoreError):
                 self.store.add("dated", due_date=bad_due_date)
+
+    def test_delete_removes_task(self):
+        task = self.store.add("temporary")
+        removed = self.store.delete(task["id"])
+
+        self.assertEqual(removed["id"], task["id"])
+        self.assertEqual(self.store.list(), [])
+
+    def test_delete_missing_raises(self):
+        with self.assertRaises(StoreError):
+            self.store.delete("nope")
 
     def test_corrupt_file(self):
         self.db.write_text("{not a list", encoding="utf-8")
         with self.assertRaises(StoreError):
             TaskStore(self.db).list()
+
+
+class CliTestCase(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.db = Path(self.tmp.name) / "tasks.json"
+        self.previous_data_file = os.environ.get("TASKER_DATA_FILE")
+        os.environ["TASKER_DATA_FILE"] = str(self.db)
+
+    def tearDown(self):
+        if self.previous_data_file is None:
+            os.environ.pop("TASKER_DATA_FILE", None)
+        else:
+            os.environ["TASKER_DATA_FILE"] = self.previous_data_file
+        self.tmp.cleanup()
+
+    def run_cli(self, argv):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            return_code = cli_mod.main(argv)
+        return return_code, stdout.getvalue(), stderr.getvalue()
+
+
+class TaskCliDeleteTests(CliTestCase):
+    def test_delete_command(self):
+        return_code, stdout, stderr = self.run_cli(["add", "delete me"])
+        self.assertEqual(return_code, 0)
+        task_id = stdout.split()[1]
+
+        return_code, stdout, stderr = self.run_cli(["delete", task_id])
+        self.assertEqual(return_code, 0)
+        self.assertIn("deleted", stdout)
+
+        return_code, stdout, stderr = self.run_cli(["list"])
+        self.assertEqual(return_code, 0)
+        self.assertIn("(no tasks)", stdout)
+
+    def test_delete_unknown_id_returns_error(self):
+        return_code, stdout, stderr = self.run_cli(["delete", "zzz"])
+        self.assertEqual(return_code, 1)
+        self.assertIn("error:", stderr)
 
 
 if __name__ == "__main__":

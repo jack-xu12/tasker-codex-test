@@ -32,6 +32,9 @@ def build_parser() -> argparse.ArgumentParser:
     done = sub.add_parser("done", help="mark a task done")
     done.add_argument("id")
 
+    delete = sub.add_parser("delete", help="delete a task")
+    delete.add_argument("id")
+
     sub.add_parser("stats", help="show statistics")
     return p
 
@@ -48,6 +51,9 @@ def main(argv: list[str] | None = None) -> int:
         elif args.cmd == "done":
             t = store.set_status(args.id, "done")
             print(f"done {t['id']}: {t['title']}")
+        elif args.cmd == "delete":
+            t = store.delete(args.id)
+            print(f"deleted {t['id']}: {t['title']}")
         elif args.cmd == "stats":
             print(json.dumps(store.stats(), ensure_ascii=False))
     except StoreError as e:
