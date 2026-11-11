@@ -74,12 +74,18 @@ class TaskStoreTests(unittest.TestCase):
         task = self.store.add("temporary")
         removed = self.store.delete(task["id"])
 
-        self.assertEqual(removed["id"], task["id"])
+        self.assertEqual(removed, task)
         self.assertEqual(self.store.list(), [])
+        self.assertEqual(TaskStore(self.db).list(), [])
 
     def test_delete_missing_raises(self):
-        with self.assertRaises(StoreError):
+        retained = self.store.add("retain me")
+
+        with self.assertRaisesRegex(StoreError, r"no task with id 'nope'"):
             self.store.delete("nope")
+
+        remaining = TaskStore(self.db).list()
+        self.assertEqual([task["id"] for task in remaining], [retained["id"]])
 
     def test_corrupt_file(self):
         self.db.write_text("{not a list", encoding="utf-8")
@@ -112,20 +118,26 @@ class TaskCliDeleteTests(CliTestCase):
     def test_delete_command(self):
         return_code, stdout, stderr = self.run_cli(["add", "delete me"])
         self.assertEqual(return_code, 0)
+        self.assertEqual(stderr, "")
         task_id = stdout.split()[1]
 
         return_code, stdout, stderr = self.run_cli(["delete", task_id])
         self.assertEqual(return_code, 0)
-        self.assertIn("deleted", stdout)
+        self.assertEqual(stderr, "")
+        self.assertIn(f"deleted {task_id}", stdout)
 
         return_code, stdout, stderr = self.run_cli(["list"])
         self.assertEqual(return_code, 0)
+        self.assertEqual(stderr, "")
         self.assertIn("(no tasks)", stdout)
 
     def test_delete_unknown_id_returns_error(self):
         return_code, stdout, stderr = self.run_cli(["delete", "zzz"])
+
         self.assertEqual(return_code, 1)
+        self.assertEqual(stdout, "")
         self.assertIn("error:", stderr)
+        self.assertIn("no task with id 'zzz'", stderr)
 
 
 if __name__ == "__main__":
