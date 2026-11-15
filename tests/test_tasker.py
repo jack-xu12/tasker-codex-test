@@ -68,6 +68,10 @@ class TaskStoreTests(unittest.TestCase):
         with self.assertRaises(StoreError):
             TaskStore(self.db).list()
 
+    def test_empty_file(self):
+        self.db.write_text("[]", encoding="utf-8")
+        self.assertEqual(TaskStore(self.db).list(), [])
+
 
 if __name__ == "__main__":
     unittest.main()
