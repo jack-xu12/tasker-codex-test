@@ -1,0 +1,19 @@
+queue_rules:
+  - name: default
+    # 队首 PR 必须同时满足这些条件才会被真正合并
+    merge_conditions:
+      - base = dev
+      - check-success = ci-test
+      - label = ready-to-merge
+      - "-draft"
+
+pull_request_rules:
+  - name: 进入 dev 合并队列
+    conditions:
+      - base = dev
+      - check-success = ci-test
+      - label = ready-to-merge
+      - "-draft"
+    actions:
+      queue:
+        name: default
