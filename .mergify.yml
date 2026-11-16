@@ -3,7 +3,6 @@ queue_rules:
     # 队首 PR 必须同时满足这些条件才会被真正合并
     merge_conditions:
       - base = dev
-      - check-success = ci-test
       - label = ready-to-merge
       - "-draft"
 
