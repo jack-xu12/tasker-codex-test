@@ -115,6 +115,16 @@ class TaskStore:
                 return t
         raise StoreError(f"no task with id {task_id!r}")
 
+    def delete(self, task_id: str) -> dict:
+        """Remove a task by id and return it. Raises StoreError if it is absent."""
+        tasks = self._load()
+        for i, t in enumerate(tasks):
+            if t["id"] == task_id:
+                removed = tasks.pop(i)
+                self._save(tasks)
+                return removed
+        raise StoreError(f"no task with id {task_id!r}")
+
     def stats(self) -> dict:
         tasks = self._load()
         out: dict = {s: 0 for s in VALID_STATUS}
