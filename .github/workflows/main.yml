@@ -1,7 +1,9 @@
 name: CI Test
+
 on:
   pull_request:
-    branches: [ dev ]
+    branches: [dev]
+  merge_group:
 
 jobs:
   ci-test:
@@ -12,3 +14,6 @@ jobs:
 
       - name: Simple test
         run: echo "CI passed, just for status check"
+
+      - name: Local merge queue check
+        run: echo "local merge_group change"
